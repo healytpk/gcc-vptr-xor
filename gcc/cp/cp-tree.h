@@ -6939,6 +6939,7 @@ enum cp_built_in_function {
   CP_BUILT_IN_IS_POINTER_INTERCONVERTIBLE_WITH_CLASS,
   CP_BUILT_IN_SOURCE_LOCATION,
   CP_BUILT_IN_EH_PTR_ADJUST_REF,
+  CP_BUILT_IN_RESTART_LIFETIME,
   CP_BUILT_IN_LAST
 };
 
@@ -8909,6 +8910,7 @@ extern tree build_assume_call			(location_t, tree);
 extern tree process_stmt_assume_attribute	(tree, tree, location_t);
 extern bool simple_empty_class_p		(tree, tree, tree_code);
 extern tree fold_builtin_source_location	(const_tree);
+extern tree fold_builtin_restart_lifetime	(location_t, int, tree *);
 extern tree get_source_location_impl_type	();
 extern tree cp_fold_immediate			(tree *, mce_value,
 						 tree = current_function_decl);
