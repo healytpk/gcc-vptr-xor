@@ -21,6 +21,10 @@
 # <http://www.gnu.org/licenses/>.
 #
 
+# Disable vptr XOR when GCC is being built
+CXX_VPTR_XOR_DISABLE = 1
+export CXX_VPTR_XOR_DISABLE
+
 # First, test for a proper version of make, but only where one is required.
 
 @if gcc
