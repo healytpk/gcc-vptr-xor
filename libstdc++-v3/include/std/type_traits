@@ -4691,6 +4691,19 @@ template<typename _Ret, typename _Fn, typename... _Args>
     constexpr auto cw = constant_wrapper<_Tp>{};
 #endif
 
+#if __cplusplus >= 201103L
+/// Determine if a type contains any mutable objects
+template<typename _Tp>
+  struct contains_mutable
+    : integral_constant<bool, __builtin_contains_mutable(_Tp)>
+  { };
+
+#  if __cplusplus >= 201402L
+     template<typename _Tp>
+       constexpr bool contains_mutable_v = contains_mutable<_Tp>::value;
+#  endif
+#endif  // if __cplusplus >= 201103L
+
   /// @} group metaprogramming
 
 _GLIBCXX_END_NAMESPACE_VERSION
