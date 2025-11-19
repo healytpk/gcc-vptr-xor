@@ -68,6 +68,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		  _Args&&... __args)
     { return (__invfwd<_Tp>(__t).*__f)(std::forward<_Args>(__args)...); }
 
+#define _GLIBCXX_INVOKE_H_CHIMERIC_PTR_H 1
+#include "chimeric_ptr.h"
+
   template<typename _Res, typename _MemFun, typename _Tp, typename... _Args>
     constexpr _Res
     __invoke_impl(__invoke_memfun_deref, _MemFun&& __f, _Tp&& __t,
