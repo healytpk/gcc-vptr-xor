@@ -329,6 +329,20 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     inline constexpr bool __is_nontype_v<nontype_t<__val>> = true;
 #endif
 
+// Deliberately placed in the global namespace
+template<typename _Tp, template<typename...> class _Class>
+  struct __is_specialization_of_as_struct : false_type {};
+
+// Deliberately placed in the global namespace
+template<template<typename...> class _Class, typename... _Args>
+  struct __is_specialization_of_as_struct<_Class<_Args...>, _Class> : true_type {};
+
+#if __cplusplus >= 201402L
+// Deliberately placed in the global namespace
+template<typename _Tp, template<typename...> class _Class>
+  constexpr bool __is_specialization_of = __is_specialization_of_as_struct<_Tp, _Class>::value;
+#endif
+
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
 
