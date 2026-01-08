@@ -329,6 +329,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     inline constexpr bool __is_nontype_v<nontype_t<__val>> = true;
 #endif
 
+#if __cplusplus >= 201402L
+  template<typename _Tp, template<typename...> class _Class>
+    constexpr bool __is_specialization_of = false;
+  template<template<typename...> class _Class, typename... _Args>
+    constexpr bool __is_specialization_of<_Class<_Args...>, _Class> = true;
+#endif
+
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
 

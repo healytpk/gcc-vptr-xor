@@ -427,12 +427,6 @@ namespace __format
       size_t _M_num_args = 0;
     };
 
-/// @cond undocumented
-  template<typename _Tp, template<typename...> class _Class>
-    constexpr bool __is_specialization_of = false;
-  template<template<typename...> class _Class, typename... _Args>
-    constexpr bool __is_specialization_of<_Class<_Args...>, _Class> = true;
-
 namespace __format
 {
   // pre: first != last
