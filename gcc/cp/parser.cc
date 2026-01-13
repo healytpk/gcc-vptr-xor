@@ -11879,17 +11879,57 @@ cp_parser_trait (cp_parser* parser, const cp_trait* trait)
       type2 = trailing;
     }
   else if (binary)
-    {
-      cp_parser_require (parser, CPP_COMMA, RT_COMMA);
+  {
+    cp_parser_require (parser, CPP_COMMA, RT_COMMA);
 
+    if (kind == CPTK_IS_SPECIALIZATION_OF)
       {
-	type_id_in_expr_sentinel s (parser);
-	type2 = cp_parser_type_id (parser);
-      }
+        const cp_token* token = cp_lexer_peek_token (parser->lexer);
 
-      if (type2 == error_mark_node)
-	return error_mark_node;
-    }
+        // Parse a (possibly qualified) template-name, e.g. std::array
+        cp_expr id = cp_parser_id_expression (parser,
+                                              /*template_keyword_p=*/false,
+                                              /*check_dependency_p=*/true,
+                                              /*template_p=*/nullptr,
+                                              /*declarator_p=*/false,
+                                              /*optional_p=*/false);
+
+        tree name = id.get_value ();
+        if (name == error_mark_node)
+          return error_mark_node;
+
+        // Reject template-ids like std::array<int,3>
+        if (TREE_CODE (name) == TEMPLATE_ID_EXPR)
+          {
+            error_at (token->location,
+                      "second argument to %<__is_specialization_of%> must be a template-name, not a template-id");
+            return error_mark_node;
+          }
+
+        // Resolve the name (like is_deducible does)
+        tree decl = cp_parser_lookup_name_simple (parser, name, token->location);
+        if (decl == error_mark_node)
+          return error_mark_node;
+
+        // Accept class/alias templates and template template parms
+        if (TREE_CODE (decl) != TEMPLATE_DECL
+            && TREE_CODE (decl) != TEMPLATE_TEMPLATE_PARM)
+          {
+            error_at (token->location,
+                      "second argument to %<__is_specialization_of%> does not name a template");
+            return error_mark_node;
+          }
+
+        type2 = decl;
+      }
+    else
+      {
+        type_id_in_expr_sentinel s (parser);
+        type2 = cp_parser_type_id (parser);
+        if (type2 == error_mark_node)
+          return error_mark_node;
+      }
+  }
   else if (variadic)
     {
       auto_vec<tree, 4> trailing;
