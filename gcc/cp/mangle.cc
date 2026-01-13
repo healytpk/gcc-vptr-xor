@@ -3999,6 +3999,17 @@ write_expression (tree expr)
 	  switch (code)
 	    {
 	    case TRAIT_EXPR:
+        if (TRAIT_EXPR_KIND (expr) == CPTK_IS_SPECIALIZATION_OF)
+          {
+            // Vendor-extended expression:
+            //   u <source-name> <template-arg>* E
+            write_char ('u');
+            write_source_name (get_identifier ("__is_specialization_of"));
+            write_template_arg (TRAIT_EXPR_TYPE1 (expr)); // type-id
+            write_template_arg (TRAIT_EXPR_TYPE2 (expr)); // TEMPLATE_DECL (template-name)
+            write_char ('E');
+            return;
+          }
 	      error ("use of built-in trait %qE in function signature; "
 		     "use library traits instead", expr);
 	      break;
