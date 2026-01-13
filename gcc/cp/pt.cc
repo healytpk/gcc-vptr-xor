@@ -22917,8 +22917,19 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	  type1 = tsubst (type1, args, complain, in_decl);
 	else
 	  type1 = tsubst_expr (type1, args, complain, in_decl);
-	tree type2 = tsubst (TRAIT_EXPR_TYPE2 (t), args,
-			     complain, in_decl);
+
+	tree type2;
+	if (TRAIT_EXPR_KIND (t) == CPTK_IS_SPECIALIZATION_OF)
+	  {
+	    // Second operand is a template-name (TEMPLATE_DECL / template parm),
+	    // not a type. Substitute it as an expression/decl.
+	    type2 = tsubst_expr (TRAIT_EXPR_TYPE2 (t), args, complain, in_decl);
+	  }
+	else
+	  {
+	    type2 = tsubst (TRAIT_EXPR_TYPE2 (t), args, complain, in_decl);
+	  }
+
 	if (TRAIT_EXPR_KIND (t) == CPTK_STRUCTURED_BINDING_SIZE
 	    && type1 != error_mark_node
 	    && !processing_template_decl)
@@ -29563,6 +29574,16 @@ value_dependent_expression_p (tree expression)
 	tree type2 = TRAIT_EXPR_TYPE2 (expression);
 	if (!type2)
 	  return false;
+
+	// Special case: __is_specialization_of(T, Template) stores a TEMPLATE_DECL
+	// (template-name) in TYPE2, not a type.  A template template parameter
+	// is dependent; a concrete template is not.
+	if (TRAIT_EXPR_KIND (expression) == CPTK_IS_SPECIALIZATION_OF)
+	  {
+		if (TREE_CODE (type2) == TEMPLATE_DECL)
+		  return DECL_TEMPLATE_PARM_P (type2); // true only for template-template parms
+		return false;
+	  }
 
 	if (TREE_CODE (type2) != TREE_VEC)
 	  return dependent_type_p (type2);
