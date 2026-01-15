@@ -3513,7 +3513,7 @@ namespace __format
 	// If _M_reserve was called then _M_bump must have been called too.
 	_GLIBCXX_DEBUG_ASSERT(__s.data() != _M_seq.data());
 
-	if constexpr (__is_specialization_of(_Seq, basic_string))
+	if constexpr (is_specialization_of<_Seq, basic_string>)
 	  _M_seq.append(__s.data(), __s.size());
 	else
 	  _M_seq.insert(_M_seq.end(), __s.begin(), __s.end());
@@ -3532,8 +3532,8 @@ namespace __format
 	// function prefers to create space directly in _M_seq rather than
 	// using _M_buf.
 
-	if constexpr (__is_specialization_of(_Seq, basic_string)
-			|| __is_specialization_of(_Seq, vector))
+	if constexpr (is_specialization_of<_Seq, basic_string>
+			|| is_specialization_of<_Seq, vector>)
 	  {
 	    // Flush the buffer to _M_seq first (should not be needed).
 	    if (this->_M_used().size()) [[unlikely]]
@@ -3561,8 +3561,8 @@ namespace __format
       void
       _M_bump(size_t __n) override
       {
-	if constexpr (__is_specialization_of(_Seq, basic_string)
-			|| __is_specialization_of(_Seq, vector))
+	if constexpr (is_specialization_of<_Seq, basic_string>
+			|| is_specialization_of<_Seq, vector>)
 	  {
 	    auto __s = this->_M_used();
 	    _GLIBCXX_DEBUG_ASSERT(__s.data() == _M_seq.data());
@@ -3574,7 +3574,7 @@ namespace __format
       }
 
       void _M_trim(span<const _CharT> __s)
-	requires __is_specialization_of(_Seq, basic_string)
+	requires is_specialization_of<_Seq, basic_string>
       {
 	_GLIBCXX_DEBUG_ASSERT(__s.data() == this->_M_buf
 				|| __s.data() == _M_seq.data());
@@ -4423,8 +4423,8 @@ namespace __format
 	  else if constexpr (is_same_v<_Td, _Float64>)
 	    return type_identity<_Float64>();
 #endif
-	  else if constexpr (__is_specialization_of(_Td, basic_string_view)
-			    || __is_specialization_of(_Td, basic_string))
+	  else if constexpr (is_specialization_of<_Td, basic_string_view>
+			    || is_specialization_of<_Td, basic_string>)
 	    {
 	      if constexpr (is_same_v<typename _Td::value_type, _CharT>)
 		return type_identity<basic_string_view<_CharT>>();
@@ -5693,7 +5693,7 @@ namespace __format
 	      using _Up = remove_cvref_t<_Ref>;
 	      if constexpr (__is_pair<_Up>)
 		return range_format::map;
-	      else if constexpr (__is_specialization_of(_Up, tuple))
+	      else if constexpr (is_specialization_of<_Up, tuple>)
 		if constexpr (tuple_size_v<_Up> == 2)
 		  return range_format::map;
 	    }

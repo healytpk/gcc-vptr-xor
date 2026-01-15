@@ -8357,6 +8357,21 @@ coerce_template_template_parms (tree parm_tmpl,
 				tree in_decl,
 				tree outer_args)
 {
+  /* ======================================================== */
+  /* ======================================================== */
+  /* Special treatment for __any_template_template_parameter  */
+  if (TREE_CODE (parm_tmpl) == TEMPLATE_DECL
+      && DECL_TEMPLATE_TEMPLATE_PARM_P (parm_tmpl)
+      && DECL_NAME (parm_tmpl)
+      && DECL_NAME (parm_tmpl) == get_identifier ("__any_template_template_parameter"))
+    {
+      return TREE_CODE (arg_tmpl) == TEMPLATE_DECL
+             && (   DECL_TYPE_TEMPLATE_P          (arg_tmpl)
+                 || DECL_TEMPLATE_TEMPLATE_PARM_P (arg_tmpl));
+    }
+  /* ======================================================== */
+  /* ======================================================== */
+
   int nparms, nargs, i;
   tree parm, arg;
   int variadic_p = 0;
