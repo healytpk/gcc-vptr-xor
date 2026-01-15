@@ -41,6 +41,7 @@
 
 #include <type_traits>
 #include <bits/move.h>
+#include <bits/is_specialization_of.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
