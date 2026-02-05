@@ -643,6 +643,8 @@ const struct attribute_spec c_common_gnu_attributes[] =
 			      handle_special_var_sec_attribute, attr_section_exclusions },
   { "access",		      1, 3, false, true, true, false,
 			      handle_access_attribute, NULL },
+  { "nrvo",		      0, 0, false, false, false, false,
+			      handle_nrvo_attribute, NULL },
   /* Attributes used by Objective-C.  */
   { "NSObject",		      0, 0, true, false, false, false,
 			      handle_nsobject_attribute, NULL },
@@ -1361,6 +1363,30 @@ handle_noreturn_attribute (tree *node, tree name, tree ARG_UNUSED (args),
     }
 
   return NULL_TREE;
+}
+
+/* Handle [[nrvo]] / [[gnu::nrvo]] on a variable.  */
+tree
+handle_nrvo_attribute (tree *node, tree name, tree args,
+                       int /*flags*/, bool *no_add_attrs)
+{
+  if (args)
+    {
+      error ("%qE attribute does not take any arguments", name);
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
+  if (!node || !*node || TREE_CODE (*node) != VAR_DECL)
+    {
+      /* Keep this as a warning/ignore if you want it “benign”.  */
+      pedwarn (input_location, OPT_Wattributes,
+               "%qE attribute only applies to variables", name);
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
+  return NULL_TREE; /* Keep attribute.  */
 }
 
 /* Handle a "hot" and attribute; arguments as in
