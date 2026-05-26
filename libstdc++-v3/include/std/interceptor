@@ -67,7 +67,7 @@ namespace std {
 
 #ifdef __x86_64__
 #               if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
-                        constexpr std::ptrdiff_t arg_offsets[] = { -4, -3, -5, -6, +2, +3 };      // Microsoft ABI  -  RCX, RDX, r8, r9, stack, stack
+                        constexpr std::ptrdiff_t arg_offsets[] = { -4, -3, -5, -6, 6, 7 };        // Microsoft ABI  -  RCX, RDX, r8, r9, stack, stack (+32 bytes shadow)
                         constexpr std::ptrdiff_t arg_retvals[] = { -7, -3 };  // RAX, RDX
 #               else
                         constexpr std::ptrdiff_t arg_offsets[] = { -1, -2, -3, -4, -5, -6 };      // System V - RDI, RSI, RDX, RCX, r8, r9
