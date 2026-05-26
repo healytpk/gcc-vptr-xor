@@ -301,6 +301,7 @@ start_function_interceptor (tree *pdecl1)
   /* Compute core mangled name.  */
   core_name = XNEWVEC (char, 7 + strlen (thunk_name) + 1);
   strcpy (core_name, "__core_" );
+
   strcat (core_name, thunk_name);
 
   /* Give only the copied core decl the new assembler name.  */
@@ -418,103 +419,108 @@ template<>
 char *
 get_assembler_for_interceptor_thunk<BaseArchitecture_x86, 32u> (const char *core_name)
 {
-  constexpr char front[] =
+#define PUSH_ALL_INTS    \
+    "pushl %%edx\n"      \
+    "pushl %%ecx\n"      \
     "pushl %%eax\n"
-    "pushl %%edx\n"
-    "pushl %%ecx\n"
-    "pushl %%ebx\n"
 
-    "movl $1, %%eax\n"
-    "cpuid\n"
-
-    "bt $25, %%edx\n"
-    "jnc 3f\n"
-
-    "bt $27, %%ecx\n"
-    "jnc 1f\n"
-    "bt $28, %%ecx\n"
-    "jnc 1f\n"
-
-    "xorl %%ecx, %%ecx\n"
-    "xgetbv\n"
-    "andl $0x6, %%eax\n"
-    "cmpl $0x6, %%eax\n"
-    "je 2f\n"
-
-    "1:\n"
-    "popl %%ebx\n"
-    "subl $48, %%esp\n"
-    "movdqu %%xmm0, 0(%%esp)\n"
-    "movdqu %%xmm1, 16(%%esp)\n"
-    "movdqu %%xmm2, 32(%%esp)\n"
-    "leal 64(%%esp), %%ecx\n"  // assuming the target is __cdecl
-    "call ";
-
-  constexpr char middle[] =
-    "\n"
-    "movl %%eax, %%esi\n"
-    "movdqu 0(%%esp), %%xmm0\n"
-    "movdqu 16(%%esp), %%xmm1\n"
-    "movdqu 32(%%esp), %%xmm2\n"
-    "addl $48, %%esp\n"
-    "popl %%ecx\n"
+#define POP_ALL_INTS     \
+    "popl %%eax\n"       \
+    "popl %%ecx\n"       \
     "popl %%edx\n"
-    "popl %%eax\n"
-    "jmp *%%esi\n"
 
-    "2:\n"
-    "popl %%ebx\n"
-    "subl $96, %%esp\n"
-    "vmovdqu %%ymm0, 0(%%esp)\n"
-    "vmovdqu %%ymm1, 32(%%esp)\n"
-    "vmovdqu %%ymm2, 64(%%esp)\n"
-    "leal 112(%%esp), %%ecx\n"  // assuming the target is __cdecl
+/* Before target: preserve only eax/ecx/edx, then pass one stack argument. */
+#define SAFE_CALL_BEFORE_TARGET(name_of_function, argument, name_of_retval_register) \
+    PUSH_ALL_INTS                               \
+    "pushl " argument "\n"                      \
+    "call " name_of_function "\n"               \
+    "addl $4, %%esp\n"                          \
+    "movl %%eax, " name_of_retval_register "\n" \
+    POP_ALL_INTS
+
+/* After target: same preservation policy, per your request. */
+#define SAFE_CALL_AFTER_TARGET(name_of_function, argument, name_of_retval_register) \
+    PUSH_ALL_INTS                               \
+    "pushl " argument "\n"                      \
+    "call " name_of_function "\n"               \
+    "addl $4, %%esp\n"                          \
+    "movl %%eax, " name_of_retval_register "\n" \
+    POP_ALL_INTS
+
+  constexpr char front[] =
+    "pushl $0\n"                    /* outward = nullptr */
+    PUSH_ALL_INTS
+    "pushl 12(%%esi)\n"             /* pass &outward to core */
     "call ";
 
   constexpr char back[] =
     "\n"
-    "movl %%eax, %%esi\n"
-    "vmovdqu 0(%%esp), %%ymm0\n"
-    "vmovdqu 32(%%esp), %%ymm1\n"
-    "vmovdqu 64(%%esp), %%ymm2\n"
-    "addl $96, %%esp\n"
-    "popl %%ecx\n"
-    "popl %%edx\n"
-    "popl %%eax\n"
-    "jmp *%%esi\n"
+    "addl $4, %%esp\n"              /* pop off the function argument */
+    "movl %%eax, %%edi\n"           /* target function address */
+    POP_ALL_INTS
+    "popl %%ecx\n"                  /* outward */
+    "cmpl $0, %%ecx\n"
+    "jne 1f\n"
+    "jmp *%%edi\n"
 
-    "3:\n"
-    "popl %%ebx\n"
-    "leal 16(%%esp), %%ecx\n"  // assuming the target is __cdecl
-    "call ";
+"1:\n"  /* has_outward */
+    /*
+     * Entry:
+     *   ecx = outward
+     *   edi = target
+     *   0(esp) = original return address
+     */
+    "pushl %%ebp\n"
+    "movl %%esp, %%ebp\n"
+    "pushl %%esi\n"
+    "movl 8(%%esp), %%esi\n"        /* original return address */
+    "pushl %%edi\n"                 /* save target */
+    "pushl %%ecx\n"                 /* save outward */
+    SAFE_CALL_BEFORE_TARGET( "__interceptor_stashed_addresses", "%%ebp", "%%ebp" )
+    "popl %%ecx\n"                  /* outward */
+    "movl %%esi, 0(%%ebp)\n"        /* addresses[0] = original return address */
+    "movl %%ecx, 4(%%ebp)\n"        /* addresses[1] = outward */
+    "popl %%edi\n"                  /* target */
+    "popl %%esi\n"
+    "popl %%ebp\n"
 
-  constexpr char tail[] =
-    "\n"
-    "movl %%eax, %%esi\n"
-    "popl %%ecx\n"
-    "popl %%edx\n"
-    "popl %%eax\n"
-    "jmp *%%esi\n";
+    "movl $2f, %%ecx\n"
+    "movl %%ecx, (%%esp)\n"         /* replace return address */
+    "jmp *%%edi\n"
 
-  char *p = XNEWVEC (char,
-                     sizeof (front) - 1u
-                     + strlen (core_name)
-                     + sizeof (middle) - 1u
-                     + strlen (core_name)
-                     + sizeof (back) - 1u
-                     + strlen (core_name)
-                     + sizeof (tail) - 1u
-                     + 1u);
+"2:\n"  /* new_return_address */
+    "pushl %%esi\n"
+    "pushl %%ebp\n"
+    "movl %%esp, %%ebp\n"
+    "addl $4, %%ebp\n"
+    "pushl %%edi\n"
+    SAFE_CALL_AFTER_TARGET( "__interceptor_stashed_addresses", "%%ebp", "%%edi" )
+    "movl 0(%%edi), %%ebp\n"        /* original return address */
+    "movl 4(%%edi), %%esi\n"        /* outward interceptor */
+    SAFE_CALL_AFTER_TARGET("*%%esi", "$0", "%%eax")
+    "movl %%ebp, %%ecx\n"
+    "popl %%edi\n"
+    "popl %%ebp\n"
+    "popl %%esi\n"
+    "jmp *%%ecx\n";
 
-  strcpy (p, front);
+  char const *prefix = "";
+
+#if defined(TARGET_PECOFF) && (0 != TARGET_PECOFF)
+  if (!TARGET_64BIT) prefix = "_";
+#endif
+
+  char *const p = XNEWVEC (char, sizeof(front)-1u + strlen (prefix) + strlen (core_name) + sizeof(back)-1u + 1u);
+  strcpy (p, front    );
+  strcat (p, prefix   );
   strcat (p, core_name);
-  strcat (p, middle);
-  strcat (p, core_name);
-  strcat (p, back);
-  strcat (p, core_name);
-  strcat (p, tail);
-
+  strcat (p, back     );
   return p;
+
+#undef SAFE_CALL_AFTER_TARGET
+#undef SAFE_CALL_BEFORE_TARGET
+#undef POP_ALL_INTS
+#undef PUSH_ALL_INTS
 }
 
 template<>
@@ -713,7 +719,17 @@ queue_emission_of_interceptor_thunk_if_decl_is_interceptor (tree fndecl)
   current_interceptor_core_asm_name = NULL     ;
 }
 
-static void emit_vector_pusher(void)
+template<BaseArchitecture A = BaseArchitecture_Unspecified, unsigned ptr_size = 0u>
+void emit_vector_pusher(void);
+
+template<>
+void emit_vector_pusher<BaseArchitecture_x86, 32u>(void)
+{
+  emit_pure_assembly_as_function ("__interceptor_vector_pusher", NULL_TREE, "ret");
+}
+
+template<>
+void emit_vector_pusher<BaseArchitecture_x86, 64u>(void)
 {
   emit_pure_assembly_as_function ("__interceptor_vector_pusher", NULL_TREE,
 "    mov __interceptor_xmm_ymm_zmm(%%rip), %%r11\n"
@@ -767,10 +783,20 @@ static void emit_vector_pusher(void)
 "    movdqu %%xmm5,  80(%%rsp)\n"
 "    movdqu %%xmm6,  96(%%rsp)\n"
 "    movdqu %%xmm7, 112(%%rsp)\n"
-"    jmp *%%r11\n");
+"    jmp *%%r11");
 }
 
-static void emit_vector_popper(void)
+template<BaseArchitecture A = BaseArchitecture_Unspecified, unsigned ptr_size = 0u>
+void emit_vector_popper(void);
+
+template<>
+void emit_vector_popper<BaseArchitecture_x86, 32u>(void)
+{
+  emit_pure_assembly_as_function ("__interceptor_vector_popper", NULL_TREE, "ret");
+}
+
+template<>
+void emit_vector_popper<BaseArchitecture_x86, 64u>(void)
 {
   emit_pure_assembly_as_function ("__interceptor_vector_popper", NULL_TREE,
 "    mov __interceptor_xmm_ymm_zmm(%%rip), %%r11\n"
@@ -824,11 +850,21 @@ static void emit_vector_popper(void)
 "    movdqu  96(%%rsp), %%xmm6\n"
 "    movdqu 112(%%rsp), %%xmm7\n"
 "    addq $128, %%rsp\n"
-"    jmp *%%r11\n"
+"    jmp *%%r11"
 );
 }
 
-static void emit_xmm_ymm_zmm_checker(void)
+template<BaseArchitecture A = BaseArchitecture_Unspecified, unsigned ptr_size = 0u>
+void emit_xmm_ymm_zmm_checker(void);
+
+template<>
+void emit_xmm_ymm_zmm_checker<BaseArchitecture_x86, 32u>(void)
+{
+  emit_pure_assembly_as_function ("__interceptor_xmm_ymm_zmm_Checker_ASM", NULL_TREE, "ret");
+}
+
+template<>
+void emit_xmm_ymm_zmm_checker<BaseArchitecture_x86, 64u>(void)
 {
   emit_pure_assembly_as_function ("__interceptor_xmm_ymm_zmm_Checker_ASM", NULL_TREE,
     /* Detect SSE-128 / AVX-256 / AVX-512 */
@@ -872,28 +908,44 @@ static void emit_xmm_ymm_zmm_checker(void)
 "    movl    $3, %%r10d\n"        // AVX-512
 "    cmove   %%r10d, %%eax\n"     // If AVX-512 state enabled, return 3
 "    pop     %%rbx\n"
-"    ret\n");
+"    ret");
 }
 
 void
 flush_pending_interceptor_thunks (void)
 {
-  if (cpp_defined (parse_in, (const unsigned char*)"_GLIBCXX_INTERCEPTOR", sizeof ("_GLIBCXX_INTERCEPTOR") - 1u))
-    {
-      emit_xmm_ymm_zmm_checker ();
-      emit_vector_pusher ();
-      emit_vector_popper ();
-    }
+  if ( TARGET_64BIT ) emit_xmm_ymm_zmm_checker< BaseArchitecture_x86, 64u > ();
+  /************/ else emit_xmm_ymm_zmm_checker< BaseArchitecture_x86, 32u > ();
 
-  if (!pending_interceptor_thunks)
+  if (!pending_interceptor_thunks || !pending_interceptor_thunks->length ())
     return;
+
+//  if (cpp_defined (parse_in, (const unsigned char*)"_GLIBCXX_INTERCEPTOR", sizeof ("_GLIBCXX_INTERCEPTOR") - 1u))
+//  {
+      if ( TARGET_64BIT )
+        {
+          emit_vector_pusher      < BaseArchitecture_x86, 64u > ();
+          emit_vector_popper      < BaseArchitecture_x86, 64u > ();
+        }
+      else
+        {
+          emit_vector_pusher      < BaseArchitecture_x86, 32u > ();
+          emit_vector_popper      < BaseArchitecture_x86, 32u > ();
+        }
+//  }
 
   for (unsigned i = 0; i < pending_interceptor_thunks->length (); ++i)
     {
       pending_interceptor_thunk *q = (*pending_interceptor_thunks)[i];
       char *asm_text = get_assembler_for_interceptor_thunk (q->core_asm_name);
 
-      emit_pure_assembly_as_function (q->core_asm_name + strlen ("__core_"), q->thunk_decl, asm_text);
+      char const *p = q->core_asm_name + strlen ("__core_");
+
+#if defined(TARGET_PECOFF) && (0 != TARGET_PECOFF)
+      if (!TARGET_64BIT) --p;  /* need an extra underscore for Win32 x86_32 */
+#endif
+
+      emit_pure_assembly_as_function (p, q->thunk_decl, asm_text);
 
       XDELETEVEC (asm_text        );
       XDELETEVEC (q->core_asm_name);
