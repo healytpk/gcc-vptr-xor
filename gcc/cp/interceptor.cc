@@ -449,8 +449,8 @@ get_assembler_for_interceptor_thunk<BaseArchitecture_x86, 32u> (const char *core
 
   constexpr char front[] =
     "pushl $0\n"                    /* outward = nullptr */
-    "leal (%%esp), %%ecx\n"         /* Prepare 'outward' address */
     PUSH_ALL_INTS
+    "leal 12(%%esp), %%ecx\n"       /* Prepare 'outward' address */
     "call ";
 
   constexpr char back[] =
