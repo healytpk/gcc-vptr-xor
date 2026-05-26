@@ -449,13 +449,12 @@ get_assembler_for_interceptor_thunk<BaseArchitecture_x86, 32u> (const char *core
 
   constexpr char front[] =
     "pushl $0\n"                    /* outward = nullptr */
+    "leal (%%esp), %%ecx\n"         /* Prepare 'outward' address */
     PUSH_ALL_INTS
-    "pushl 12(%%esi)\n"             /* pass &outward to core */
     "call ";
 
   constexpr char back[] =
     "\n"
-    "addl $4, %%esp\n"              /* pop off the function argument */
     "movl %%eax, %%edi\n"           /* target function address */
     POP_ALL_INTS
     "popl %%ecx\n"                  /* outward */
@@ -492,7 +491,7 @@ get_assembler_for_interceptor_thunk<BaseArchitecture_x86, 32u> (const char *core
     "pushl %%esi\n"
     "pushl %%ebp\n"
     "movl %%esp, %%ebp\n"
-    "addl $4, %%ebp\n"
+    "addl $1, %%ebp\n"
     "pushl %%edi\n"
     SAFE_CALL_AFTER_TARGET( "__interceptor_stashed_addresses", "%%ebp", "%%edi" )
     "movl 0(%%edi), %%ebp\n"        /* original return address */
@@ -860,7 +859,7 @@ void emit_xmm_ymm_zmm_checker(void);
 template<>
 void emit_xmm_ymm_zmm_checker<BaseArchitecture_x86, 32u>(void)
 {
-  emit_pure_assembly_as_function ("__interceptor_xmm_ymm_zmm_Checker_ASM", NULL_TREE, "ret");
+  emit_pure_assembly_as_function ("__interceptor_xmm_ymm_zmm_Checker_ASM", NULL_TREE, "movl $1, %%eax\nret");
 }
 
 template<>
