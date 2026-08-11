@@ -2070,6 +2070,15 @@ ix86_option_override_internal (bool main_args_p,
     }
 #endif
 
+  /* -mx32df is the x32 (ILP32) ABI with 64-bit dual function pointers, so
+     force on the 64-bit ISA and the x32 ABI bit and force off LP64.  Data
+     pointers stay 32-bit; only function pointers widen (ADDR_SPACE_DUALCODE).  */
+  if (opts->x_ix86_x32df)
+    {
+      opts->x_ix86_isa_flags |= OPTION_MASK_ISA_64BIT | OPTION_MASK_ABI_X32;
+      opts->x_ix86_isa_flags &= ~OPTION_MASK_ABI_64;
+    }
+
   if (TARGET_X32_P (opts->x_ix86_isa_flags))
     {
       /* Always turn on OPTION_MASK_ISA_64BIT and turn off

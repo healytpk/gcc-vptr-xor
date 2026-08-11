@@ -973,6 +973,25 @@ ix86_target_macros (void)
   cpp_define (parse_in, "__SEG_FS");
   cpp_define (parse_in, "__SEG_GS");
 
+  if (TARGET_64BIT)
+    {
+      /* Integer types wide enough to hold a 64-bit code (function) pointer
+	 even when data pointers are narrower.  Consumed by the (rebuilt)
+	 <stdint.h> to define intfptr_t / uintfptr_t.  In LP64 that width is
+	 long; under the x32-based -mx32df (ILP32) it is long long.  */
+      if (ix86_x32df)
+	{
+	  cpp_define (parse_in, "__X32DF__");
+	  cpp_define (parse_in, "__INTFPTR_TYPE__=long long int");
+	  cpp_define (parse_in, "__UINTFPTR_TYPE__=long long unsigned int");
+	}
+      else
+	{
+	  cpp_define (parse_in, "__INTFPTR_TYPE__=long int");
+	  cpp_define (parse_in, "__UINTFPTR_TYPE__=long unsigned int");
+	}
+    }
+
   if (flag_cf_protection != CF_NONE)
     cpp_define_formatted (parse_in, "__CET__=%d", flag_cf_protection & ~CF_SET);
 }
@@ -991,6 +1010,7 @@ ix86_register_pragmas (void)
 
   c_register_addr_space ("__seg_fs", ADDR_SPACE_SEG_FS);
   c_register_addr_space ("__seg_gs", ADDR_SPACE_SEG_GS);
+  c_register_addr_space ("__dualcode", ADDR_SPACE_DUALCODE);
 
 #ifdef REGISTER_SUBTARGET_PRAGMAS
   REGISTER_SUBTARGET_PRAGMAS ();

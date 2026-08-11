@@ -37,13 +37,13 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define SPEC_64 "m64"
 #define SPEC_X32 "m16|m32|m64:;"
 #else
-#define SPEC_64 "m16|m32|mx32:;"
-#define SPEC_X32 "mx32"
+#define SPEC_64 "m16|m32|mx32|mx32df:;"
+#define SPEC_X32 "mx32|mx32df"
 #endif
 #else
-#define SPEC_32 "m64|mx32:;"
+#define SPEC_32 "m64|mx32|mx32df:;"
 #define SPEC_64 "m64"
-#define SPEC_X32 "mx32"
+#define SPEC_X32 "mx32|mx32df"
 #endif
 
 #undef ASM_SPEC

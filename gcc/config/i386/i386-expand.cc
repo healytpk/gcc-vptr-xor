@@ -11365,6 +11365,32 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
   gcc_assert (!TARGET_64BIT || !pop);
 
   rtx addr = XEXP (fnaddr, 0);
+
+  /* -mx32df: an indirect call goes through a 64-bit dual function pointer
+     packed as (entry:32 | (stack|abi):32).  Route it through the out-of-line
+     __dualcall helper -- pass the dual pointer in %r11 and call __dualcall, which
+     unpacks the code entry and the optional custom stack, swaps to that stack
+     around the real call, and returns.  Direct (symbolic) calls are unaffected;
+     ix86_function_ok_for_sibcall forbids tail-calling a dual pointer, so a dual
+     call is never a sibcall here.  */
+  if (ix86_x32df && !SYMBOL_REF_P (addr))
+    {
+      /* The generic call machinery narrows the DImode dual pointer to a
+	 ptr_mode (SImode) lowpart subreg for x32; recover the full 64-bit
+	 value so the stack + ABI tag in the high half survive to %r11.  */
+      rtx dual = addr;
+      if (SUBREG_P (dual) && GET_MODE (SUBREG_REG (dual)) == DImode)
+	dual = SUBREG_REG (dual);
+      else if (GET_MODE (dual) != DImode)
+	dual = convert_to_mode (DImode, dual, 1);
+      rtx r11 = gen_rtx_REG (DImode, R11_REG);
+      emit_move_insn (r11, dual);
+      use_reg (&use, r11);
+      rtx sym = gen_rtx_SYMBOL_REF (Pmode, "__dualcall");
+      SYMBOL_REF_FLAGS (sym) |= SYMBOL_FLAG_FUNCTION | SYMBOL_FLAG_EXTERNAL;
+      fnaddr = gen_rtx_MEM (QImode, sym);
+      addr = sym;
+    }
   if (TARGET_MACHO && !TARGET_64BIT)
     {
 #if TARGET_MACHO

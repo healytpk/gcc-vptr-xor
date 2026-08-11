@@ -1014,6 +1014,12 @@ ix86_function_ok_for_sibcall (tree decl, tree exp)
   if (ix86_function_naked (current_function_decl))
     return false;
 
+  /* -mx32df: a call through a dual function pointer must return so the
+     __dualcall helper can restore the stack it swapped in, so it can never be a
+     sibling (tail) call.  Indirect calls have DECL == NULL_TREE.  */
+  if (ix86_x32df && decl == NULL_TREE)
+    return false;
+
   /* Sibling call isn't OK if there are no caller-saved registers
      since all registers must be preserved before return.  */
   if (cfun->machine->call_saved_registers
@@ -15004,6 +15010,12 @@ ix86_print_operand_address_as (FILE *file, rtx addr,
   disp = parts.disp;
   scale = parts.scale;
 
+  /* __dualcode (a function pointer) is an ordinary linear address with no
+     segment override, so collapse it to the generic space here -- otherwise
+     the segment-printing switch below hits gcc_unreachable ().  */
+  if (as == ADDR_SPACE_DUALCODE)
+    as = ADDR_SPACE_GENERIC;
+
   if (ADDR_SPACE_GENERIC_P (as))
     as = parts.seg;
   else
@@ -28042,7 +28054,88 @@ ix86_optab_supported_p (int op, machine_mode mode1, machine_mode,
 static bool
 ix86_addr_space_zero_address_valid (addr_space_t as)
 {
-  return as != ADDR_SPACE_GENERIC;
+  return as != ADDR_SPACE_GENERIC && as != ADDR_SPACE_DUALCODE;
+}
+
+/* Address space support for __dualcode -- the 64-bit "dual" function-pointer
+   space used by -mx32df.  On the x32 base data pointers are 32-bit (SImode),
+   but a __dualcode function pointer is 64-bit (DImode): its low 32 bits are the
+   code entry and its high 32 bits carry a custom stack address plus an ABI tag
+   (see the __dualcall lowering in ix86_expand_call).  It converts to/from a
+   generic data pointer as a pure width change.  */
+
+static scalar_int_mode
+ix86_addr_space_pointer_mode (addr_space_t as)
+{
+  if (as == ADDR_SPACE_DUALCODE)
+    return DImode;
+  return default_addr_space_pointer_mode (as);
+}
+
+static scalar_int_mode
+ix86_addr_space_address_mode (addr_space_t as)
+{
+  if (as == ADDR_SPACE_DUALCODE)
+    return DImode;
+  return default_addr_space_address_mode (as);
+}
+
+static bool
+ix86_addr_space_valid_pointer_mode (scalar_int_mode mode, addr_space_t as)
+{
+  if (as == ADDR_SPACE_DUALCODE)
+    return mode == DImode;
+  return default_addr_space_valid_pointer_mode (mode, as);
+}
+
+/* __dualcode (a function pointer) is unrelated to the generic data space:
+   converting between a function pointer and an object pointer needs an explicit
+   cast, so it is a subset of nothing but itself.  */
+
+static bool
+ix86_addr_space_subset_p (addr_space_t subset, addr_space_t superset)
+{
+  if (subset == superset)
+    return true;
+  if (subset == ADDR_SPACE_DUALCODE || superset == ADDR_SPACE_DUALCODE)
+    return false;
+  return default_addr_space_subset_p (subset, superset);
+}
+
+/* Convert between a __dualcode function pointer and a generic (32-bit under
+   x32) data pointer: a pure width change.  Narrowing drops the dual pointer's
+   high 32 bits (the custom stack address + ABI tag), keeping the low 32-bit
+   code address; widening zero-extends, so the resulting dual pointer names
+   "here, now, default convention".  */
+
+static rtx
+ix86_addr_space_convert (rtx op, tree from_type, tree to_type)
+{
+  addr_space_t from_as = TYPE_ADDR_SPACE (TREE_TYPE (from_type));
+  addr_space_t to_as = TYPE_ADDR_SPACE (TREE_TYPE (to_type));
+
+  if (from_as == ADDR_SPACE_DUALCODE && to_as == ADDR_SPACE_GENERIC)
+    return convert_to_mode (ptr_mode, op, 1);
+  if (from_as == ADDR_SPACE_GENERIC && to_as == ADDR_SPACE_DUALCODE)
+    return convert_to_mode (DImode, op, 1);
+
+  /* Identical spaces: no change.  */
+  return op;
+}
+
+/* Implement TARGET_ADDR_SPACE_POINTER_ADDR_SPACE.  With -mx32df, a pointer to a
+   function type defaults to the 64-bit __dualcode space (so function pointers
+   are 8 bytes while data pointers stay 4); every data pointer and anything
+   already in an explicit space is left in place.  */
+
+static addr_space_t
+ix86_addr_space_pointer_addr_space (tree to_type)
+{
+  if (ix86_x32df
+      && TYPE_ADDR_SPACE (to_type) == ADDR_SPACE_GENERIC
+      && FUNC_OR_METHOD_TYPE_P (to_type))
+    return ADDR_SPACE_DUALCODE;
+  return TYPE_ADDR_SPACE (to_type);
 }
 
 static void
@@ -29103,6 +29196,24 @@ ix86_libgcc_floating_mode_supported_p
 
 #undef TARGET_ADDR_SPACE_ZERO_ADDRESS_VALID
 #define TARGET_ADDR_SPACE_ZERO_ADDRESS_VALID ix86_addr_space_zero_address_valid
+
+#undef TARGET_ADDR_SPACE_POINTER_MODE
+#define TARGET_ADDR_SPACE_POINTER_MODE ix86_addr_space_pointer_mode
+
+#undef TARGET_ADDR_SPACE_ADDRESS_MODE
+#define TARGET_ADDR_SPACE_ADDRESS_MODE ix86_addr_space_address_mode
+
+#undef TARGET_ADDR_SPACE_VALID_POINTER_MODE
+#define TARGET_ADDR_SPACE_VALID_POINTER_MODE ix86_addr_space_valid_pointer_mode
+
+#undef TARGET_ADDR_SPACE_SUBSET_P
+#define TARGET_ADDR_SPACE_SUBSET_P ix86_addr_space_subset_p
+
+#undef TARGET_ADDR_SPACE_CONVERT
+#define TARGET_ADDR_SPACE_CONVERT ix86_addr_space_convert
+
+#undef TARGET_ADDR_SPACE_POINTER_ADDR_SPACE
+#define TARGET_ADDR_SPACE_POINTER_ADDR_SPACE ix86_addr_space_pointer_addr_space
 
 #undef TARGET_INIT_LIBFUNCS
 #define TARGET_INIT_LIBFUNCS ix86_init_libfuncs
