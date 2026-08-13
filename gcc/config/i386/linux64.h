@@ -37,3 +37,60 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define MUSL_DYNAMIC_LINKER64 "/lib/ld-musl-x86_64.so.1"
 #undef MUSL_DYNAMIC_LINKERX32
 #define MUSL_DYNAMIC_LINKERX32 "/lib/ld-musl-x32.so.1"
+
+/* --- -m32df links against newlib, not glibc. ----------------------------
+   The m32df ABI widens function pointers to 64 bits, so it is ABI-
+   incompatible with any stock C library: every call through a function
+   pointer across the library boundary would disagree about the pointer's
+   width.  It therefore gets its own C library (newlib, built with -m32df),
+   kept in its own os-directory (../libm32df, see t-linux64) so that "-lc"
+   under -m32df resolves to newlib there while -m64/-m32/-mx32 keep finding
+   glibc in lib64/lib/libx32 -- the two C libraries never collide on the
+   search path.
+
+   All that remains is to switch the *conventions* that differ between a
+   glibc-hosted binary and a static newlib one:
+
+     * force a static link for -m32df.  Because the dynamic linker in
+       LINK_SPEC is emitted only inside %{!static:...}, this also drops the
+       PT_INTERP / -dynamic-linker automatically, and makes
+       LINK_GCC_C_SEQUENCE_SPEC wrap libc/libgcc in --start-group (newlib's
+       libc and its OS-glue are mutually recursive);
+     * use newlib's crt0 in place of glibc's crt1/crti/crtn (crtbegin/crtend
+       still come from this ABI's libgcc multilib, which is also where the
+       __dualcall support routine lives);
+     * pull in newlib (-lc) plus the m32df OS-glue library (-lm32dfsys, the
+       syscall nucleus) instead of glibc's -lc and -lpthread.
+
+   Everything outside the %{m32df:...} arm is the unmodified GNU userspace
+   behaviour, so -m64/-m32/-mx32 are completely unaffected.  */
+
+/* -nolibc suppresses the two things the generic GNU/Linux link sequence would
+   otherwise add for this ABI: LINK_LIBATOMIC_SPEC (-latomic_asneeded, and
+   libatomic is not built for m32df -- it needs a hosted C library and
+   pthreads) and %L, which is empty here anyway.  %G (-lgcc) is unaffected, so
+   the C library, crt0 and __dualcall still come from this ABI's libgcc.
+   -no-pie is forced too: the __dualcall helper plants an absolute address for
+   its return trampoline, and a static non-PIE layout keeps that simple.  */
+#undef  DRIVER_SELF_SPECS
+#define DRIVER_SELF_SPECS \
+  "%{m32df:%{!static:-static} %{!nolibc:-nolibc} %{!pie:-no-pie} -fno-pie} " \
+  SUBTARGET_DRIVER_SELF_SPECS
+
+#undef  STARTFILE_SPEC
+#define STARTFILE_SPEC \
+  "%{m32df:crt0%O%s crtbegin%O%s}" \
+  "%{!m32df:" GNU_USER_TARGET_STARTFILE_SPEC "}"
+
+#undef  ENDFILE_SPEC
+#define ENDFILE_SPEC \
+  "%{m32df:crtend%O%s}" \
+  "%{!m32df:" GNU_USER_TARGET_ENDFILE_SPEC "}"
+
+/* -m32df has no separate C library to name here: its minimal libc is built
+   into this ABI's libgcc multilib (see libgcc/config/i386/m32df-libc.c), which
+   the driver links anyway via LINK_GCC_C_SEQUENCE_SPEC.  Keeping the arm empty
+   means nothing on the search path can shadow glibc for the other ABIs.  */
+#undef  LIB_SPEC
+#define LIB_SPEC \
+  "%{!m32df:" GNU_USER_TARGET_LIB_SPEC "}"

@@ -1,0 +1,14 @@
+# Runtime support for the -m32df ABI.  Every file here guards itself with
+# __M32DF__, so they contribute nothing to the m32, m64 and mx32 multilibs --
+# which keep using glibc untouched.
+
+# The __dualcall call-lowering helper.
+LIB2ADD_ST += $(srcdir)/config/i386/dualcall.S
+
+# The minimal C library for this ABI (no glibc, no newlib port exists).
+LIB2ADD_ST += $(srcdir)/config/i386/m32df-libc.c
+
+# Startup code for -m32df programs; STARTFILE_SPEC names crt0%O%s.
+EXTRA_PARTS += crt0.o
+crt0.o: $(srcdir)/config/i386/crt0-m32df.S
+	$(gcc_compile) -c $<
