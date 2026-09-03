@@ -3242,7 +3242,11 @@ struct GTY(()) lang_decl_fn {
   unsigned contract_wrapper : 1;
   enum lang_contract_helper contract_helper : 2;
 
-  unsigned spare : 4;
+  /* GNU extension: the definition was written "noexcept (static)",
+     so the body must be provably non-throwing.  */
+  unsigned noexcept_static_p : 1;
+
+  unsigned spare : 3;
 
   /* 32-bits padding on 64-bit host.  */
 
@@ -3724,6 +3728,12 @@ struct GTY(()) lang_decl {
    it's deleted; we will decide in synthesize_method.  */
 #define DECL_MAYBE_DELETED(NODE) \
   (LANG_DECL_FN_CHECK (NODE)->maybe_deleted)
+
+/* True if NODE is a FUNCTION_DECL whose definition was written with
+   the GNU extension "noexcept (static)", meaning that its body must
+   be provably non-throwing.  */
+#define DECL_NOEXCEPT_STATIC_P(NODE) \
+  (LANG_DECL_FN_CHECK (NODE)->noexcept_static_p)
 
 /* Nonzero for FUNCTION_DECL means that this function's body has been
    checked for immediate-escalating expressions and maybe promoted.  It
@@ -7075,6 +7085,10 @@ struct cp_declarator {
       tree tx_qualifier;
       /* The exception-specification for the function.  */
       tree exception_specification;
+      /* If the exception-specification was written using the GNU
+	 extension "noexcept (static)", the location of its
+	 "noexcept" keyword.  Otherwise UNKNOWN_LOCATION.  */
+      location_t noexcept_static_loc;
       /* The late-specified return type, if any.  */
       tree late_return_type;
       /* The trailing requires-clause, if any.  */
@@ -7819,6 +7833,12 @@ extern int nothrow_libfn_p			(const_tree);
 extern void check_handlers			(tree);
 extern tree finish_noexcept_expr		(tree, tsubst_flags_t);
 extern bool expr_noexcept_p			(tree, tsubst_flags_t);
+extern void check_noexcept_static_body		(tree);
+
+/* True while parsing the body of an "extern noexcept(static) { ... }"
+   region.  Saved and restored around each extern-declaration region, so
+   that a nested one inherits it unless it says otherwise.  */
+extern bool noexcept_static_region_p;
 extern void explain_not_noexcept		(tree);
 extern void perform_deferred_noexcept_checks	(void);
 extern bool nothrow_spec_p			(const_tree);
